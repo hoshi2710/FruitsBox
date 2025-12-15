@@ -142,6 +142,7 @@ public class PhysicsEngine {
      * @param enteredDirection 사과가 입사하는 방향
      */
     public void applyBounceFromBoundary(Apple a, Direction enteredDirection) {
+        // 사과 입사 방향에 따라서 사과 스냅(위치 변경) 포인트를 설정하기
         Point snapPoint = switch(enteredDirection) {
                 case NORTH -> new Point(a.getPosition().getX(), 0);
                 case SOUTH -> new Point(a.getPosition().getX(), panel.getHeight() - a.getSize());
@@ -149,11 +150,12 @@ public class PhysicsEngine {
                 case WEST -> new Point(0, a.getPosition().getY());
         };
         a.setPosition(snapPoint);
+        // 만약 상, 하 방향에 부딪혔다면 각각 y축방향으로 속도를 반전시키고 탄성 계수를 적용한 속도값을 적용하기
         if (enteredDirection == Direction.SOUTH || enteredDirection == Direction.NORTH) {
             double nextVy = a.getVy() * -1 * bounceFactor;
             a.setVy(Math.abs(nextVy) < 0.05 ? 0 : nextVy);
         }
-        else {
+        else { // 아닌경우 좌, 우 방향에 부딪힌걸로 판단하고 각각 x 축방향으로 속도를 반전시키고 탄성 계수를 적용한 속도값을 적용하기
             double nextVx = a.getVx() * -1 * bounceFactor;
             a.setVx(Math.abs(nextVx) < 0.05 ? 0 : nextVx);
         }
@@ -166,10 +168,14 @@ public class PhysicsEngine {
      * @param apples 비교할 사과 객체들
      */
     public void applyBounce(Apple a1, List<Apple> apples) {
+        // 더 정밀한 충돌력 적용을 위해 같은 계산을 loop번 반복
         int loop = 4;
         for (int i = 0; i < loop; i++) {
+            // 사과 객체 a1과 그외 모든 사과객체를 비교
             for(Apple a2 : apples) {
+                // 같은 객체이거나 이미 사라진 객체이거나 충돌된 객체가 아니라면 충돌력을 계산하지 않는다.
                 if(a1 == a2 || a2.isUsed() || !isCollided(a1,a2)) continue;
+                // 위 예외에 해당하지 않는다면 충돌력을 계산하고 적용한다.
                 bounce(a1,a2);
             }
         }
@@ -181,18 +187,26 @@ public class PhysicsEngine {
      * @param apples 전체 사과 객체들
      */
     public void applyExplode(Apple a, List<Apple> apples) {
+        // p1 = 폭빌하는 사과 객체의 위치 벡터
         Vector p1 = new Vector(a.getPosition().getX(), a.getPosition().getY());
+        // p2 = 폭발하는 사과 주변에 있어서 영향을 받아 날라가는 사과들 위치 벡터를 저장할 변수
         Vector p2;
-        for (Apple apple : apples) {
-            if(apple == a || apple.isUsed()) continue;
+        for (Apple apple : apples) { // 모든 사과에 대해서 폭발력 적용
+            if(apple == a || apple.isUsed()) continue; // 이미 사라진 사과이거나 폭발하는 사과 객체와 같다면 건너뛰기
+            // p2를 각 사과의 위치로 만든 벡터로 설정
             p2 = new Vector(apple.getPosition().getX(), apple.getPosition().getY());
+            // 비교 대상 사과의 속도 벡터를 생성하고 ov 변수에 저장
             Vector ov = new Vector(apple.getVx(),apple.getVy());
+            // p2에서 p1 벡터를 빼고 그 벡터 길이로 나누어서 방향만 남은 단위벡터 nh를 생성한다.
             Vector n = p2.subtract(p1);
             Vector nh = n.multiply(1/n.getLength());
+            // 두 사과 객체의 거리를 계산하여 d 변수에 저장
             double d = getDistanceBetweenCenter(a,apple) - a.getSize()/2 - apple.getSize()/2;
-            d = d<0 ? 0 : d;
+            d = d<0 ? 0 : d; // 사과가 관통등 이슈로 거리가 음수가 나올때 모두 0으로 뭉개기
+            // (1/2)^((d/60) * 1 / size) 이 식의 결과를 기존 속도에 더하는 방식으로 폭발할때 주변 사과가 가속되는 속도를 구현한다.
             Vector v = nh.multiply(Math.pow(0.5,d/60 * (1 / apple.getSize())));
             Vector av = ov.add(v);
+            // 최종적으로 계산된 속도 벡터(av)를 각 사과의 x,y축 속도 적용 함수를 통해 각각 적용한다.
             apple.setVx(av.getPoint().getX());
             apple.setVy(av.getPoint().getY());
         }
@@ -204,38 +218,53 @@ public class PhysicsEngine {
      * @param a2 사과 객체 2
      */
     public void bounce(Apple a1, Apple a2) {
+        // p1,p2 = 각각 a1,a2 사과 객체의 중심 좌표 벡터
         Vector p1 = new Vector(a1.getPosition().getX() + a1.getSize()/2, a1.getPosition().getY() + a1.getSize()/2);
         Vector p2 = new Vector(a2.getPosition().getX() + a2.getSize()/2, a2.getPosition().getY() + a2.getSize()/2);
+        // 두 벡터를 빼고 길이로 나누어서 방향만 남긴 단위벡터(nh)를 만든다.
         Vector n = p1.subtract(p2);
         Vector nh = n.multiply(1/n.getLength());
+        // 단위벡터(nh)에 수직인 법선 단위 벡터(th)도 같이 생성한다.
         Vector th = new Vector(nh.getPoint().getY(), nh.getPoint().getX() * -1);
+        // v1,v2 = 두 사과의 현재 속도 벡터
         Vector v1 = new Vector(a1.getVx(), a1.getVy());
         Vector v2 = new Vector(a2.getVx(), a2.getVy());
+        // r = 두 사과의 반지름의 합
         double r = a1.getSize()/2+a2.getSize()/2;
+        // penetration = 두 사과가 얼마나 겹쳐졌는지 길이
         double penetration = r - getDistanceBetweenCenter(a1,a2);
+        // 만약 사과가 조금이라도 겹쳐졌다면
         if(penetration > 0) {
-            double slop = 0.2;
-            double adjust = Math.max(penetration - slop, 0.0) * 0.6;
+            double slop = 1.0; // 오차 범위 (1.0까지 겹쳐지는 정도는 사실상 무시)
+            // 조정할 거리 계산 (오차범위 내일경우 0으로 설정하여 조절하지 않음)
+            double adjust = Math.max(penetration - slop, 0.0);
+            // 두 사과의 크기 비율에 맞추어 뒤로 후퇴하는 비중을 조정
             double inv11 = 1.0 / (a1.getSize());
             double inv22 = 1.0 / (a2.getSize());
             double invSum = inv11 + inv22;
+            // (해당 사과 크기 비율 / 전체 크기 비율) * 조정할 거리 를 계산후 원래 사과 위치 벡터에 더하여 사과 위치를 각각 조정한다.
             Vector adjustA1 = nh.multiply(adjust*(inv11/invSum));
             Vector adjustA2 = nh.multiply(adjust*(inv22/invSum)).multiply(-1);
             p1 = p1.add(adjustA1);
             p2 = p2.add(adjustA2);
+            // 조정된 p1,p2 벡터를 이용하여 최종적으로 사과 위치를 setPosition 매소드를 이용하여 반영한다.
             a1.setPosition(new Point(p1.getPoint().getX() -  a1.getSize()/2, p1.getPoint().getY() - a1.getSize()/2));
             a2.setPosition(new Point(p2.getPoint().getX() - a2.getSize()/2, p2.getPoint().getY() - a2.getSize()/2));
         }
-        double v1n = nh.multiply(v1);
-        double v1t = th.multiply(v1);
-        double v2n = nh.multiply(v2);
-        double v2t = th.multiply(v2);
+        double v1n = nh.multiply(v1); // 1번 사과 속도에서 사과의 충돌 방향 속도 벡터 만을 단위 벡터를 곱하여 추출
+        double v1t = th.multiply(v1); // 1번 사과 속도에서 사과의 충돌 방향과 관계 없는 방향의 속도 벡터만을 법선 단위 벡터를 곱하여 추출
+        double v2n = nh.multiply(v2); // 2번 사과 속도에서 사과의 충돌 방향 속도 벡터 만을 단위 벡터를 곲하여 추출
+        double v2t = th.multiply(v2); // 2번 사과 속도에서 사과의 충돌 방향과 관계 없는 방향의 속도 벡터만을 법선 단위 벡터를 곱하여 추출
+        // v1n, v2n 속도와 두 사과의 크기, 탄성 계수를 이용하여 1차원 충돌 공식을 이용하여 각각 충돌 이후 충돌 방향 선상의 속도를 각각 구한다.
         double v1n_p = (a1.getSize() * v1n + a2.getSize() * v2n - a2.getSize() * this.bounceFactor * (v1n - v2n)) / (a1.getSize() + a2.getSize());
         double v2n_p = (a1.getSize() * v1n + a2.getSize() * v2n + a1.getSize() * this.bounceFactor * (v1n - v2n)) / (a1.getSize() + a2.getSize());
+        // 충돌 방향과 관계 없는 수직 방향은 속도의 변화가 없음으로 그대로 사용
         double v1t_p = v1t;
         double v2t_p = v2t;
+        // 계산된 속도를 다시 결합하여 하나의 벡터로 만든다. 일차원 충돌 결과값이 스칼라 값이므로 단위 벡터를 곱하여 벡터 형태로 변환후 두 벡터를 더한다.
         Vector v1_p = nh.multiply(v1n_p).add(th.multiply(v1t_p));
         Vector v2_p = nh.multiply(v2n_p).add(th.multiply(v2t_p));
+        // 이렇게 계산된 두 사과의 최종 속도를 두 사과의 x,y축 속도로 각각 적용한다.
         a1.setVx(v1_p.getPoint().getX());
         a1.setVy(v1_p.getPoint().getY());
         a2.setVx(v2_p.getPoint().getX());

@@ -3,7 +3,7 @@ package model;
 import java.awt.*;
 
 /**
- *  <b>[🧱Model] - Sparkle.java</b><br>
+ *  <b>[🗿Model] - Sparkle.java</b><br>
  *  사과 객체가 파괴될때 발생하는 각각의 입자에 대한 객체의 클래스 입니다.<br>
  */
 public class Sparkle {
